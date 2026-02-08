@@ -2,13 +2,11 @@ use crate::light_manager_component::{LightManagerComponent, RawLight, Light};
 use algoe::bivector::Bivector;
 use nalgebra::Vector3;
 use v4::{
-    V4,
-    builtin_components::{
+    V4, builtin_components::{
         camera_component::CameraComponent,
         mesh_component::{MeshComponent, VertexDescriptor},
         transform_component::TransformComponent,
-    },
-    scene,
+    }, engine_support::texture_support::{TextureBundle, TextureProperties}, scene
 };
 use wgpu::{Color, vertex_attr_array};
 
@@ -30,6 +28,7 @@ async fn main() {
 
     let rendering_manager = engine.rendering_manager();
     let device = rendering_manager.device();
+    let queue = rendering_manager.queue();
 
     scene! {
         scene: sandbox_scene,
@@ -55,7 +54,11 @@ async fn main() {
                         buffer_type: wgpu::BufferBindingType::Uniform,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         extra_usages: wgpu::BufferUsages::COPY_DST
-                    )
+                    ),
+                    Texture(
+                        texture_bundle: TextureBundle::from_path("./assets/shaderball_diffuse.png", device, queue, TextureProperties::default()).await.unwrap().1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    ),
                 ],
                 ident: "shader_mat"
             },
@@ -63,7 +66,7 @@ async fn main() {
                 MeshComponent<Vertex>::from_obj("assets/shaderball.obj", true).ident("_").await.unwrap(),
                 TransformComponent(position: Vector3::zeros(), rotation: Bivector::new(0.0, 0.0, std::f32::consts::FRAC_PI_2).exponentiate(), ident: "transform"),
                 LightManagerComponent(
-                    lights: vec![Light {position: Vector3::new(4.0, 2.0, 0.0), color: [0.18, 0.149, 0.431], brightness: 2.0}],
+                    lights: vec![Light {position: Vector3::new(4.0, 2.0, 0.0), color: [1.0; 3], brightness: 5.0}],
                     material: ident("shader_mat"),
                     shaderball_transform: ident("transform")
                 )
