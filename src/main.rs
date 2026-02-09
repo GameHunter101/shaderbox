@@ -1,12 +1,15 @@
-use crate::light_manager_component::{LightManagerComponent, RawLight, Light};
+use crate::light_manager_component::{Light, LightManagerComponent, RawLight};
 use algoe::bivector::Bivector;
 use nalgebra::Vector3;
 use v4::{
-    V4, builtin_components::{
+    V4,
+    builtin_components::{
         camera_component::CameraComponent,
-        mesh_component::{MeshComponent, VertexDescriptor},
+        mesh_component::{MeshComponent, VertexData, VertexDescriptor},
         transform_component::TransformComponent,
-    }, engine_support::texture_support::{TextureBundle, TextureProperties}, scene
+    },
+    engine_support::texture_support::{TextureBundle, TextureProperties},
+    scene,
 };
 use wgpu::{Color, vertex_attr_array};
 
@@ -44,7 +47,7 @@ async fn main() {
                 pipeline: {
                     vertex_shader_path: "shaders/vertex.wgsl",
                     fragment_shader_path: "shaders/fragment.wgsl",
-                    vertex_layouts: [Vertex::vertex_layout(), TransformComponent::vertex_layout::<3>()],
+                    vertex_layouts: [Vertex::vertex_layout(), TransformComponent::vertex_layout::<5>()],
                     uses_camera: true,
                 },
                 attachments: [
@@ -57,6 +60,22 @@ async fn main() {
                     ),
                     Texture(
                         texture_bundle: TextureBundle::from_path("./assets/shaderball_diffuse.png", device, queue, TextureProperties::default()).await.unwrap().1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    ),
+                    Texture(
+                        texture_bundle: TextureBundle::from_path("./assets/shaderball_roughness.png", device, queue, TextureProperties {format: wgpu::TextureFormat::R8Unorm, ..Default::default()}).await.unwrap().1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    ),
+                    Texture(
+                        texture_bundle: TextureBundle::from_path("./assets/shaderball_metallic.png", device, queue, TextureProperties {format: wgpu::TextureFormat::R8Unorm, ..Default::default()}).await.unwrap().1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    ),
+                    Texture(
+                        texture_bundle: TextureBundle::from_path("./assets/shaderball_ao.jpg", device, queue, TextureProperties {format: wgpu::TextureFormat::R8Unorm, ..Default::default()}).await.unwrap().1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                    ),
+                    Texture(
+                        texture_bundle: TextureBundle::from_path("./assets/shaderball_normal.jpg", device, queue, TextureProperties {format: wgpu::TextureFormat::Rgba8Unorm, ..Default::default()}).await.unwrap().1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     ),
                 ],
@@ -85,17 +104,28 @@ struct Vertex {
     pos: [f32; 3],
     normal: [f32; 3],
     tex_coords: [f32; 2],
+    tangent: [f32; 3],
+    bitangent: [f32; 3],
 }
 
 impl VertexDescriptor for Vertex {
-    const ATTRIBUTES: &[wgpu::VertexAttribute] =
-        &vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2];
+    const ATTRIBUTES: &[wgpu::VertexAttribute] = &vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2, 3 => Float32x3, 4 => Float32x3];
 
-    fn from_pos_normal_coords(pos: Vec<f32>, normal: Vec<f32>, tex_coords: Vec<f32>) -> Self {
+    fn from_data(
+        VertexData {
+            pos,
+            normal,
+            tex_coords,
+            tangent,
+            bitangent,
+        }: VertexData,
+    ) -> Self {
         Self {
-            pos: pos.try_into().unwrap(),
-            normal: normal.try_into().unwrap(),
-            tex_coords: tex_coords.try_into().unwrap(),
+            pos,
+            normal,
+            tex_coords,
+            tangent,
+            bitangent,
         }
     }
 }
