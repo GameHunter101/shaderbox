@@ -43,6 +43,11 @@ fn chi(x: f32) -> f32 {
     }
 }
 
+fn fresnel(f_0: vec3<f32>, f_90: vec3<f32>, cos_angle: f32) -> vec3<f32> {
+    // return f_0 + (vec3f(1.0) - f_0) * pow(1.0 - dot(normal, w_o), 0.0, 1.0, 5.0);
+    return mix(f_0, f_90, pow(clamp(1.0 - cos_angle, 0.0, 1.0), 5.0));
+}
+
 fn isotropic_ggx(alpha_g_sqr: f32, dot_norm_half: f32) -> f32 {
     let denom = (1.0 + dot_norm_half * dot_norm_half * (alpha_g_sqr - 1.0));
 
@@ -51,6 +56,13 @@ fn isotropic_ggx(alpha_g_sqr: f32, dot_norm_half: f32) -> f32 {
 }
 
 fn combined_isotropic_geometric_attenuation(alpha_g_sqr: f32, normal: vec3<f32>, w_i: vec3<f32>, w_o: vec3<f32>) -> f32 {
+    let mu_o = clamp(dot(normal, w_o), 0.0, 1.0);
+    let mu_i = clamp(dot(normal, w_i), 0.0, 1.0);
+
+    return 0.5 / (mu_o * sqrt(alpha_g_sqr + mu_i * (mu_i - alpha_g_sqr * mu_i)) + mu_i * sqrt(alpha_g_sqr + mu_o * (mu_o - alpha_g_sqr * mu_o)));
+}
+
+fn isotropic_geometric_attenuation(alpha_g_sqr: f32, normal: vec3<f32>, w_o: vec3<f32>, w_i: vec3<f32>) -> f32 {
     let mu_o = clamp(dot(normal, w_o), 0.0, 1.0);
     let mu_i = clamp(dot(normal, w_i), 0.0, 1.0);
 
@@ -84,7 +96,7 @@ fn anisotropic_geometric_attenuation(
     return (chi(dot(half_vector, w_i)) * chi(dot(half_vector, w_o))) / (1.0 + lambda_w_o + lambda_w_i);
 }
 
-fn eval_specular(roughness: f32, anisotropy: f32, normal: vec3<f32>, half_vector: vec3<f32>, w_i: vec3<f32>, w_o: vec3<f32>, tangent: vec3<f32>, bitangent: vec3<f32>) -> f32 {
+fn eval_specular(base_color: vec3<f32>, roughness: f32, anisotropy: f32, normal: vec3<f32>, half_vector: vec3<f32>, w_i: vec3<f32>, w_o: vec3<f32>, tangent: vec3<f32>, bitangent: vec3<f32>) -> vec3<f32> {
     let alpha_g = roughness * roughness;
 
     let dot_norm_half = dot(normal, half_vector);
@@ -94,34 +106,41 @@ fn eval_specular(roughness: f32, anisotropy: f32, normal: vec3<f32>, half_vector
     let alpha_y = roughness * roughness * (1.0 - anisotropy);
     let ggx_normal_distribution = anisotropic_ggx(alpha_x, alpha_y, dot_norm_half, dot(half_vector, tangent), dot(half_vector, bitangent));
 
-    /* let mu_o = clamp(dot(normal, w_o), 0.0, 1.0);
-    let mu_i = clamp(dot(normal, w_i), 0.0, 1.0);
-
-    let combined_geometric_attenuation_term = 0.5 / (mu_o * sqrt(alpha_g_sqr + mu_i * (mu_i - alpha_g_sqr * mu_i)) + mu_i * sqrt(alpha_g_sqr + mu_o * (mu_o - alpha_g_sqr * mu_o))); */
     let combined_geometric_attenuation_term = anisotropic_geometric_attenuation(alpha_x, alpha_y, normal, w_i, w_o, half_vector, tangent, bitangent) / (4.0 * abs(dot(normal, w_o)) * abs(dot(normal, w_i)));
 
-    let f_90 = 0.5 + 2.0 * (roughness * dot(w_i, half_vector) * dot(w_i, half_vector));
-    let f_0 = 1.0;
-    let fresnel = f_0 + (f_90 - f_0) * pow(1.0 - clamp(dot(normal, w_i), 0.0, 1.0), 5.0);
+    let fresnel = fresnel(base_color, vec3f(1.0), dot(normal, w_o));
 
     return fresnel * ggx_normal_distribution * combined_geometric_attenuation_term;
 }
 
+fn eval_clearcoat(clearcoat_gloss: f32, w_i: vec3<f32>, w_o: vec3<f32>, half_vector: vec3<f32>, normal: vec3<f32>, tangent: vec3<f32>, bitangent: vec3<f32>) -> vec3<f32> {
+    let alpha_g = mix(0.1, 0.001, clearcoat_gloss);
+    let alpha_g_sqr = alpha_g * alpha_g;
+    let half_dot_norm = dot(half_vector, normal);
+    let ndf = isotropic_ggx(alpha_g_sqr, half_dot_norm); //(alpha_g_sqr - 1.0) / (PI * log(alpha_g_sqr) * (1.0 + (alpha_g_sqr - 1.0) * half_dot_norm * half_dot_norm));
+    let geometric_attenuation_term = anisotropic_geometric_attenuation(0.25, 0.25, normal, w_i, w_o, half_vector, tangent, bitangent);
+    let ehta = 1.5;
+    let r_0 = ((ehta - 1.0) * (ehta - 1.0)) / ((ehta + 1.0) * (ehta + 1.0));
+    let fresnel_term = fresnel(vec3f(r_0), vec3f(1.0), dot(normal, w_o));
+    return (ndf * geometric_attenuation_term * fresnel_term) / (4.0 * abs(dot(normal, w_i)));
+}
+
 @fragment
 fn main(in: VertexOut) -> @location(0) vec4<f32> {
-    let coords = vec2f(in.tex_coords.x, 1.0 - in.tex_coords.y);
-    let albedo = textureSample(diffuse_tex, sample, coords).xyz;
-    let roughness =  textureSample(roughness_tex, sample, coords).x;
-    let anisotropy = 0.8;
-    let metallic = textureSample(metallic_tex, sample, coords).x;
-    let ao = textureSample(ao_tex, sample, coords).x;
-    let normal_sample = textureSample(normal_tex, sample, coords).xyz;
+    let albedo = textureSample(diffuse_tex, sample, in.tex_coords).xyz;
+    let roughness = textureSample(roughness_tex, sample, in.tex_coords).x;
+    let anisotropy = 0.9;
+    let metallic = textureSample(metallic_tex, sample, in.tex_coords).x;
+    let ao = textureSample(ao_tex, sample, in.tex_coords).x;
+    let normal_sample = textureSample(normal_tex, sample, in.tex_coords).xyz;
+    let clearcoat = 1.0;
+    let clearcoat_gloss = 1.0;
 
-    let normal_strength = 1.0;
+    let normal_strength = 0.8;
 
     let tbn = mat3x3(in.world_tangent, in.world_bitangent, in.world_normal);
 
-    let tangent_normal = (normal_sample * 2.0 - 1.0) * vec3f(normal_strength, normal_strength, 1.0);
+    let tangent_normal = normalize(normal_sample * 2.0 - 1.0) * vec3f(normal_strength, normal_strength, 1.0);
     let world_normal = normalize(tbn * tangent_normal);
 
     let base_color = albedo * ao;
@@ -144,9 +163,12 @@ fn main(in: VertexOut) -> @location(0) vec4<f32> {
         let dist = distance(lights[i].pos, in.world_pos);
         let attenuation = lights[i].brightness / (dist * dist);
 
-        let specular = eval_specular(roughness, anisotropy, world_normal, half_vector, w_i, w_o, in.tangent, in.bitangent);
+        let specular_lobe = eval_specular(vec3(0.0), roughness, anisotropy, world_normal, half_vector, w_i, w_o, in.tangent, in.bitangent);
 
-        full_color = (diffuse * (1.0 - metallic) + specular * mix(vec3f(1.0), base_color, metallic)) * lights[i].color * attenuation;
+        let clearcoat_lobe = eval_clearcoat(clearcoat_gloss, w_i, w_o, half_vector, world_normal, in.tangent, in.bitangent);
+
+        // full_color = specular_lobe;
+        full_color = (diffuse * (1.0 - metallic) + specular_lobe * mix(vec3f(1.0), base_color, metallic) + 0.25 * clearcoat * clearcoat_lobe) * lights[i].color * attenuation;
     }
     return vec4f(full_color, 1.0);
 }

@@ -30,6 +30,7 @@ pub struct LightManagerComponent {
     lights: Vec<Light>,
     material: ComponentId,
     shaderball_transform: ComponentId,
+    camera_transform: ComponentId,
 }
 
 impl ComponentSystem for LightManagerComponent {
@@ -47,19 +48,34 @@ impl ComponentSystem for LightManagerComponent {
             light.position = Bivector::new(0.0, 0.0, 0.001).exponentiate() * light.position;
         } */
 
-        let cursor_delta = engine_details.cursor_delta.0;
+        let cursor_delta = engine_details.cursor_delta;
         if engine_details
             .mouse_state
             .contains(&winit::event::MouseButton::Left)
-            && let Some(component) = other_components
+        {
+            if let Some(shaderball_component) = other_components
                 .iter_mut()
                 .filter(|comp| comp.id() == self.shaderball_transform)
                 .next()
-            && let Some(transform) = component.downcast_mut::<TransformComponent>()
-        {
-            let rotation = transform.get_rotation();
-            let updated_rotation = (rotation * Bivector::new(0.0, 0.0, cursor_delta * 0.005).exponentiate()).normalize();
-            transform.set_rotation(updated_rotation);
+                && let Some(shaderball_transform) =
+                    shaderball_component.downcast_mut::<TransformComponent>()
+            {
+                let rotation = shaderball_transform.get_rotation();
+                let updated_rotation = (rotation
+                    * Bivector::new(0.0, 0.0, cursor_delta.0 * 0.005).exponentiate())
+                .normalize();
+                shaderball_transform.set_rotation(updated_rotation);
+            }
+
+            if let Some(cam_component) = other_components
+                .iter_mut()
+                .filter(|comp| comp.id() == self.camera_transform)
+                .next()
+                && let Some(cam_transform) = cam_component.downcast_mut::<TransformComponent>()
+            {
+                cam_transform
+                    .set_position(cam_transform.get_position() * (1.0 + cursor_delta.1 * 0.001));
+            }
         }
 
         let shaderball_mat = materials

@@ -252,11 +252,20 @@ dependencies = [
 
 [[package]]
 name = "avif-serialize"
-version = "0.8.6"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47c8fbc0f831f4519fe8b810b6a7a91410ec83031b8233f730a0480029f6a23f"
+checksum = "375082f007bd67184fb9c0374614b29f9aaa604ec301635f72338bb65386a53d"
 dependencies = [
  "arrayvec",
+]
+
+[[package]]
+name = "bevy_mikktspace"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bb60c753b968a2de0fd279b76a3d19517695e771edb4c23575c7f92156315de"
+dependencies = [
+ "glam",
 ]
 
 [[package]]
@@ -1047,6 +1056,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.29.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8babf46d4c1c9d92deac9f7be466f76dfc4482b6452fc5024b5e8daf6ffeb3ee"
+
+[[package]]
 name = "glow"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1342,15 +1357,15 @@ checksum = "7a79a3332a6609480d7d0c9eab957bca6b455b91bb84e66d19f5ff66294b85b8"
 
 [[package]]
 name = "libc"
-version = "0.2.180"
+version = "0.2.181"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
+checksum = "459427e2af2b9c839b132acb702a1c654d95e10f8c326bfc2ad11310e458b1c5"
 
 [[package]]
 name = "libfuzzer-sys"
-version = "0.4.10"
+version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5037190e1f70cbeef565bd267599242926f724d3b8a9f510fd7e0b540cfa4404"
+checksum = "f12a681b7dd8ce12bff52488013ba614b869148d54dd79836ab85aafdd53f08d"
 dependencies = [
  "arbitrary",
  "cc",
@@ -2369,10 +2384,11 @@ dependencies = [
 
 [[package]]
 name = "shaderbox"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "algoe",
  "bytemuck",
+ "futures",
  "image",
  "nalgebra",
  "tokio",
@@ -2453,7 +2469,8 @@ dependencies = [
 [[package]]
 name = "smaa"
 version = "0.19.0"
-source = "git+https://github.com/GameHunter101/smaa-rs#28f68ce58c9b099257057d69933128b1f278be31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1566e58c44b4042856b4586ef1d58647a0e4b823320001b7e451b0f765cdaa04"
 dependencies = [
  "wgpu",
 ]
@@ -2741,9 +2758,9 @@ dependencies = [
 
 [[package]]
 name = "toml_parser"
-version = "1.0.6+spec-1.1.0"
+version = "1.0.7+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3198b4b0a8e11f09dd03e133c0280504d0801269e9afa46362ffde1cbeebf44"
+checksum = "247eaa3197818b831697600aadf81514e577e0cba5eab10f7e064e78ae154df1"
 dependencies = [
  "winnow",
 ]
@@ -2807,11 +2824,12 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "v4"
-version = "0.2.64"
-source = "git+https://github.com/GameHunter101/V4-Engine#2c5b9c72baade3a2501bbdcbd50692efe5eca220"
+version = "0.2.68"
+source = "git+https://github.com/GameHunter101/V4-Engine#9af556514d434a1af34486cdd1eaea6c018ee7c2"
 dependencies = [
  "algoe",
  "async-trait",
+ "bevy_mikktspace",
  "bytemuck",
  "downcast-rs 2.0.2",
  "glyphon",
@@ -2827,7 +2845,7 @@ dependencies = [
 [[package]]
 name = "v4-core"
 version = "0.2.66"
-source = "git+https://github.com/GameHunter101/V4-Engine#2c5b9c72baade3a2501bbdcbd50692efe5eca220"
+source = "git+https://github.com/GameHunter101/V4-Engine#9af556514d434a1af34486cdd1eaea6c018ee7c2"
 dependencies = [
  "async-scoped",
  "async-trait",
@@ -2851,7 +2869,7 @@ dependencies = [
 [[package]]
 name = "v4-macros"
 version = "0.2.63"
-source = "git+https://github.com/GameHunter101/V4-Engine#2c5b9c72baade3a2501bbdcbd50692efe5eca220"
+source = "git+https://github.com/GameHunter101/V4-Engine#9af556514d434a1af34486cdd1eaea6c018ee7c2"
 dependencies = [
  "darling",
  "proc-macro2",

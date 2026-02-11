@@ -47,7 +47,7 @@ fn main(in: VertexIn, transform: TransformData) -> VertexOut {
     var out: VertexOut;
     out.clip_pos = camera.view_proj * world_pos;
     out.world_pos = world_pos.xyz;
-    out.normal = normalize((mat * vec4f(in.normal, 1.0)).xyz);
+    out.normal = in.normal;
     out.tex_coords = in.tex_coords;
     out.world_tangent = normalize((mat * vec4f(in.tangent, 1.0)).xyz);
     out.world_bitangent = normalize((mat * vec4f(in.bitangent, 1.0)).xyz);

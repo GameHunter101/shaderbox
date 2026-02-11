@@ -1,5 +1,6 @@
 use crate::light_manager_component::{Light, LightManagerComponent, RawLight};
 use algoe::bivector::Bivector;
+use image::{EncodableLayout, GenericImageView};
 use nalgebra::Vector3;
 use v4::{
     V4,
@@ -11,7 +12,7 @@ use v4::{
     engine_support::texture_support::{TextureBundle, TextureProperties},
     scene,
 };
-use wgpu::{Color, vertex_attr_array};
+use wgpu::{Color, TextureFormat, vertex_attr_array};
 
 mod light_manager_component;
 
@@ -33,13 +34,59 @@ async fn main() {
     let device = rendering_manager.device();
     let queue = rendering_manager.queue();
 
+    let textures = [
+        (
+            "./assets/shaderball_diffuse.jpg",
+            TextureFormat::Rgba8UnormSrgb,
+        ),
+        ("./assets/shaderball_roughness.png", TextureFormat::R8Unorm),
+        ("./assets/shaderball_metallic.png", TextureFormat::R8Unorm),
+        ("./assets/shaderball_ao.jpg", TextureFormat::R8Unorm),
+        ("./assets/shaderball_normal.jpg", TextureFormat::Rgba8Unorm),
+    ];
+
+    let handles = textures.map(|(path, ty)| {
+        tokio::spawn(async move {
+            let raw_image = tokio::fs::read(path).await.unwrap();
+            let img = image::load_from_memory(&raw_image).expect("Failed to create image");
+            let dims = img.dimensions();
+            let bytes = if ty.components() != 1 {
+                let rgba8 = img.into_rgba8();
+                rgba8.as_bytes().to_vec()
+            } else {
+                img.as_bytes().to_vec()
+            };
+
+            (bytes, dims, ty)
+        })
+    });
+
+    let bytes_res: Result<Vec<_>, _> = futures::future::join_all(handles)
+        .await
+        .into_iter()
+        .collect();
+    let bytes: [(Vec<u8>, (u32, u32), TextureFormat); 5] = bytes_res.unwrap().try_into().unwrap();
+    let [diffuse, roughness, metallic, ao, normal] = bytes.map(|(bytes, dimensions, format)| {
+        TextureBundle::from_bytes(
+            &bytes,
+            dimensions,
+            device,
+            queue,
+            TextureProperties {
+                format,
+                ..Default::default()
+            },
+        )
+        .1
+    });
+
     scene! {
         scene: sandbox_scene,
         active_camera: "cam",
         "cam_ent" = {
             components: [
-                CameraComponent(field_of_view: 60.0, aspect_ratio: 1.0, near_plane: 0.1, far_plane: 50.0, sensitivity: 0.000, movement_speed: 0.0, ident: "cam"),
-                TransformComponent(position: Vector3::new(0.0, 1.5, -4.0), rotation: Bivector::new(0.0, -std::f32::consts::FRAC_PI_6 / 2.0, 0.0).exponentiate())
+                CameraComponent(field_of_view: 60.0, aspect_ratio: 1.0, near_plane: 0.1, far_plane: 50.0, sensitivity: 0.0, movement_speed: 0.0, ident: "cam"),
+                TransformComponent(position: Vector3::new(0.0, 1.5, -4.0), rotation: Bivector::new(0.0, -std::f32::consts::FRAC_PI_6 / 2.0, 0.0).exponentiate(), ident: "cam_transform")
             ]
         },
         "shader_model" = {
@@ -59,23 +106,23 @@ async fn main() {
                         extra_usages: wgpu::BufferUsages::COPY_DST
                     ),
                     Texture(
-                        texture_bundle: TextureBundle::from_path("./assets/shaderball_diffuse.png", device, queue, TextureProperties::default()).await.unwrap().1,
+                        texture_bundle: diffuse,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     ),
                     Texture(
-                        texture_bundle: TextureBundle::from_path("./assets/shaderball_roughness.png", device, queue, TextureProperties {format: wgpu::TextureFormat::R8Unorm, ..Default::default()}).await.unwrap().1,
+                        texture_bundle: roughness,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     ),
                     Texture(
-                        texture_bundle: TextureBundle::from_path("./assets/shaderball_metallic.png", device, queue, TextureProperties {format: wgpu::TextureFormat::R8Unorm, ..Default::default()}).await.unwrap().1,
+                        texture_bundle: metallic,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     ),
                     Texture(
-                        texture_bundle: TextureBundle::from_path("./assets/shaderball_ao.jpg", device, queue, TextureProperties {format: wgpu::TextureFormat::R8Unorm, ..Default::default()}).await.unwrap().1,
+                        texture_bundle: ao,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     ),
                     Texture(
-                        texture_bundle: TextureBundle::from_path("./assets/shaderball_normal.jpg", device, queue, TextureProperties {format: wgpu::TextureFormat::Rgba8Unorm, ..Default::default()}).await.unwrap().1,
+                        texture_bundle: normal,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     ),
                 ],
@@ -85,9 +132,10 @@ async fn main() {
                 MeshComponent<Vertex>::from_obj("assets/shaderball.obj", true).ident("_").await.unwrap(),
                 TransformComponent(position: Vector3::zeros(), rotation: Bivector::new(0.0, 0.0, std::f32::consts::FRAC_PI_2).exponentiate(), ident: "transform"),
                 LightManagerComponent(
-                    lights: vec![Light {position: Vector3::new(4.0, 2.0, 0.0), color: [1.0; 3], brightness: 5.0}],
+                    lights: vec![Light {position: Vector3::new(4.0, 4.0, 0.0), color: [1.0; 3], brightness: 5.0}],
                     material: ident("shader_mat"),
-                    shaderball_transform: ident("transform")
+                    shaderball_transform: ident("transform"),
+                    camera_transform: ident("cam_transform")
                 )
             ]
         }
