@@ -2384,7 +2384,7 @@ dependencies = [
 
 [[package]]
 name = "shaderbox"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "algoe",
  "bytemuck",

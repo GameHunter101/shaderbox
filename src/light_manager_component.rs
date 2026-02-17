@@ -44,9 +44,9 @@ impl ComponentSystem for LightManagerComponent {
             ..
         }: UpdateParams<'_, '_>,
     ) -> v4::ecs::actions::ActionQueue {
-        /* if let Some(light) = self.lights.get_mut(0) {
+        if let Some(light) = self.lights.get_mut(0) {
             light.position = Bivector::new(0.0, 0.0, 0.001).exponentiate() * light.position;
-        } */
+        }
 
         let cursor_delta = engine_details.cursor_delta;
         if engine_details

@@ -20,11 +20,11 @@ struct VertexOut {
     @location(0) world_pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
-    @location(3) world_tangent: vec3<f32>,
-    @location(4) world_bitangent: vec3<f32>,
-    @location(5) world_normal: vec3<f32>,
-    @location(6) tangent: vec3<f32>,
-    @location(7) bitangent: vec3<f32>,
+    @location(3) world_normal: vec3<f32>,
+    @location(4) world_tangent: vec3<f32>,
+    // @location(4) world_bitangent: vec3<f32>,
+    @location(5) tangent: vec3<f32>,
+    // @location(7) bitangent: vec3<f32>,
 }
 
 struct Camera {
@@ -96,7 +96,7 @@ fn anisotropic_geometric_attenuation(
     return (chi(dot(half_vector, w_i)) * chi(dot(half_vector, w_o))) / (1.0 + lambda_w_o + lambda_w_i);
 }
 
-fn eval_specular(base_color: vec3<f32>, roughness: f32, anisotropy: f32, normal: vec3<f32>, half_vector: vec3<f32>, w_i: vec3<f32>, w_o: vec3<f32>, tangent: vec3<f32>, bitangent: vec3<f32>) -> vec3<f32> {
+fn eval_specular(base_color: vec3<f32>, roughness: f32, metallic: f32, anisotropy: f32, normal: vec3<f32>, half_vector: vec3<f32>, w_i: vec3<f32>, w_o: vec3<f32>, tangent: vec3<f32>, bitangent: vec3<f32>) -> vec3<f32> {
     let alpha_g = roughness * roughness;
 
     let dot_norm_half = dot(normal, half_vector);
@@ -108,9 +108,10 @@ fn eval_specular(base_color: vec3<f32>, roughness: f32, anisotropy: f32, normal:
 
     let combined_geometric_attenuation_term = anisotropic_geometric_attenuation(alpha_x, alpha_y, normal, w_i, w_o, half_vector, tangent, bitangent) / (4.0 * abs(dot(normal, w_o)) * abs(dot(normal, w_i)));
 
-    let fresnel = fresnel(base_color, vec3f(1.0), dot(normal, w_o));
+    let f0 = mix(vec3f(0.04), base_color, metallic);
+    let fresnel = fresnel(f0, vec3f(1.0), dot(half_vector, w_o));
 
-    return fresnel * ggx_normal_distribution * combined_geometric_attenuation_term;
+    return /* fresnel *  */vec3f(ggx_normal_distribution)/*  * combined_geometric_attenuation_term */;
 }
 
 fn eval_clearcoat(clearcoat_gloss: f32, w_i: vec3<f32>, w_o: vec3<f32>, half_vector: vec3<f32>, normal: vec3<f32>, tangent: vec3<f32>, bitangent: vec3<f32>) -> vec3<f32> {
@@ -129,16 +130,18 @@ fn eval_clearcoat(clearcoat_gloss: f32, w_i: vec3<f32>, w_o: vec3<f32>, half_vec
 fn main(in: VertexOut) -> @location(0) vec4<f32> {
     let albedo = textureSample(diffuse_tex, sample, in.tex_coords).xyz;
     let roughness = textureSample(roughness_tex, sample, in.tex_coords).x;
-    let anisotropy = 0.9;
+    let anisotropy = 0.3;
     let metallic = textureSample(metallic_tex, sample, in.tex_coords).x;
     let ao = textureSample(ao_tex, sample, in.tex_coords).x;
     let normal_sample = textureSample(normal_tex, sample, in.tex_coords).xyz;
     let clearcoat = 1.0;
-    let clearcoat_gloss = 1.0;
+    let clearcoat_gloss = 0.5;
 
     let normal_strength = 0.8;
 
-    let tbn = mat3x3(in.world_tangent, in.world_bitangent, in.world_normal);
+    let world_bitangent = normalize(cross(in.world_normal, in.world_tangent));
+
+    let tbn = mat3x3(in.world_tangent, world_bitangent, in.world_normal);
 
     let tangent_normal = normalize(normal_sample * 2.0 - 1.0) * vec3f(normal_strength, normal_strength, 1.0);
     let world_normal = normalize(tbn * tangent_normal);
@@ -149,6 +152,8 @@ fn main(in: VertexOut) -> @location(0) vec4<f32> {
 
     var full_color = vec3f(0.0);
 
+    let bitangent = normalize(cross(in.normal, in.tangent));
+
     for (var i = 0; i < 10; i++) {
         if lights[i].enabled == 0 {
             continue;
@@ -158,16 +163,16 @@ fn main(in: VertexOut) -> @location(0) vec4<f32> {
         let reflection = -w_i - 2.0 * (-dot(w_i, world_normal) * world_normal);
         let half_vector = normalize(w_i + w_o);
 
-        let diffuse = base_color * dot(world_normal, lights[i].pos);
+        let diffuse = base_color / PI * dot(world_normal, lights[i].pos);
 
         let dist = distance(lights[i].pos, in.world_pos);
         let attenuation = lights[i].brightness / (dist * dist);
 
-        let specular_lobe = eval_specular(vec3(0.0), roughness, anisotropy, world_normal, half_vector, w_i, w_o, in.tangent, in.bitangent);
 
-        let clearcoat_lobe = eval_clearcoat(clearcoat_gloss, w_i, w_o, half_vector, world_normal, in.tangent, in.bitangent);
+        let specular_lobe = eval_specular(base_color, roughness, metallic, anisotropy, world_normal, half_vector, w_i, w_o, in.tangent, bitangent);
 
-        // full_color = specular_lobe;
+        let clearcoat_lobe = eval_clearcoat(clearcoat_gloss, w_i, w_o, half_vector, world_normal, in.tangent, bitangent);
+
         full_color = (diffuse * (1.0 - metallic) + specular_lobe * mix(vec3f(1.0), base_color, metallic) + 0.25 * clearcoat * clearcoat_lobe) * lights[i].color * attenuation;
     }
     return vec4f(full_color, 1.0);

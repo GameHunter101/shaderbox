@@ -11,11 +11,9 @@ struct VertexOut {
     @location(0) world_pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
-    @location(3) world_tangent: vec3<f32>,
-    @location(4) world_bitangent: vec3<f32>,
-    @location(5) world_normal: vec3<f32>,
-    @location(6) tangent: vec3<f32>,
-    @location(7) bitangent: vec3<f32>,
+    @location(3) world_normal: vec3<f32>,
+    @location(4) world_tangent: vec3<f32>,
+    @location(5) tangent: vec3<f32>,
 }
 
 struct TransformData {
@@ -44,16 +42,19 @@ fn main(in: VertexIn, transform: TransformData) -> VertexOut {
 
     let world_pos = mat * vec4f(in.pos, 1.0);
 
+    let vertex_angle = atan2(in.pos.z, in.pos.x);
+    let tangent_non_ortho = vec3f(-sin(vertex_angle), cos(vertex_angle), 0.0);
+    let projection = dot(tangent_non_ortho, in.normal)/dot(in.normal, in.normal) * in.normal;
+    let tangent = normalize(tangent_non_ortho - projection);
+
     var out: VertexOut;
     out.clip_pos = camera.view_proj * world_pos;
     out.world_pos = world_pos.xyz;
     out.normal = in.normal;
     out.tex_coords = in.tex_coords;
-    out.world_tangent = normalize((mat * vec4f(in.tangent, 1.0)).xyz);
-    out.world_bitangent = normalize((mat * vec4f(in.bitangent, 1.0)).xyz);
     out.world_normal = normalize((mat * vec4f(in.normal, 1.0)).xyz);
-    out.tangent = normalize(in.tangent);
-    out.bitangent = normalize(in.bitangent);
+    out.world_tangent = normalize((mat * vec4f(tangent, 1.0)).xyz);
+    out.tangent = tangent;
 
     return out;
 }

@@ -132,7 +132,7 @@ async fn main() {
                 MeshComponent<Vertex>::from_obj("assets/shaderball.obj", true).ident("_").await.unwrap(),
                 TransformComponent(position: Vector3::zeros(), rotation: Bivector::new(0.0, 0.0, std::f32::consts::FRAC_PI_2).exponentiate(), ident: "transform"),
                 LightManagerComponent(
-                    lights: vec![Light {position: Vector3::new(4.0, 4.0, 0.0), color: [1.0; 3], brightness: 5.0}],
+                    lights: vec![Light {position: Vector3::new(-4.0, 2.0, 0.0), color: [1.0; 3], brightness: 10.0}],
                     material: ident("shader_mat"),
                     shaderball_transform: ident("transform"),
                     camera_transform: ident("cam_transform")
